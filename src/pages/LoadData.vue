@@ -207,101 +207,65 @@ async function getProducts () {
 
 async function createXLSX() {
   // Step 1: Create a new workbook
-const wb = XLSX.utils.book_new();
-const dataF = productsStore.getAll
-const flatten = dataF.flat()
-const headers = Object.keys(flatten[0])
-const index = headers.indexOf('Tags')
-headers.splice(index, 1, 'Tags')
-const rows = flatten.map(r => Object.values(r).map(data => {
+  const wb = XLSX.utils.book_new();
+
+  // Fetching and flattening product data from the Pinia store
+  const dataF = productsStore.getAll;
+  const flattenData = dataF.flat();
+
+  // Extract headers from the first object
+  const headers = Object.keys(flattenData[0]);
+
+  // Map through the flattened data to get rows, handling nested objects/arrays and missing 'Value'
+  const rows = flattenData.map(item =>
+    headers.map(key => {
+      const data = item[key];  // Access the data by the key
+
+      // If the data is an array, process each item in the array
       if (Array.isArray(data)) {
-        // If the data is an array, iterate through each object
-        const sortedData = data.sort((a, b) => a.Id - b.Id)
-        return sortedData.map(item => {
-            // Check if the item is an object
-            if (typeof item === 'object' && item !== null) {
-                return Object.values(item).join(', '); // Join values of the object as a string
-            }
-            return String(item); // Convert non-objects to string (if needed)
-        }).join('; '); // Join all object strings with a delimiter
-    } else if (typeof data === 'object' && data !== null) {
-        // If it is a single object, return its values as a string
-        return Object.values(data).join(', '); // Join values of the object
-    }
+        // Sort the array if needed and return the 'Value' property of each object
+        return data
+          .sort((a, b) => a.Id - b.Id)
+          .map(subItem => (subItem && subItem.Value) ? `Id: ${subItem.Id} - ${subItem.Value}` : '')  // Return 'Value' or empty string
+          .join('; ');  // Join array items as a string
+      }
 
-    // If data is neither, return it as a string
-    return String(data);
-}))
-// Step 2: Create sample data
-const data = [
- [...headers],
- ...rows
-];
+      // If the data is an object, return the 'Value' property or empty string
+      if (typeof data === 'object' && data !== null) {
+        return data.Value || '';
+      }
 
-// Step 3: Convert the data to a worksheet
-const ws = XLSX.utils.aoa_to_sheet(data);
-const headerRowHeight = [
-    { hpt: 80 },
-]
+      // For non-object values, return the string representation (or the value as is)
+      return String(data);
+    })
+  );
 
-// Dynamically set row height based on size of data
-const dataRowHeight = Array.from({ length: data[0].length }, () => ({ hpt: 30 }))
+  console.log('rows', rows);  // Optional: Log the rows for debugging
 
-// Combine header row height and data row height
-const rowHeight = [...headerRowHeight, ...dataRowHeight]
+  // Step 2: Prepare the data for the Excel sheet (add headers and rows)
+  const sheetData = [
+    [...headers],  // Include headers
+    ...rows        // Include the mapped data rows
+  ];
 
-// Create a new worksheet:
-const worksheet = XLSX.utils.json_to_sheet([])
+  // Step 3: Convert the data to a worksheet
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
+  // Optional: Set row heights for styling
+  const headerRowHeight = [{ hpt: 80 }];
+  const dataRowHeight = Array.from({ length: sheetData.length }, () => ({ hpt: 30 }));
+  const rowHeight = [...headerRowHeight, ...dataRowHeight];
 
-// Assign height to rows
-worksheet['!rows'] = rowHeight
+  // Apply row heights to the worksheet
+  ws['!rows'] = rowHeight;
 
-// Add the headers to the worksheet:
-XLSX.utils.sheet_add_aoa(worksheet, [headers])
+  // Step 4: Append the worksheet to the workbook
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-// add data to sheet
-XLSX.utils.sheet_add_json(worksheet, data, {
-    skipHeader: true,
-    origin: -1
-})
+  // Step 5: Write the workbook to a file
+  XLSX.writeFile(wb, 'agrip.xlsx');
 
-// Add formatting by looping through data in sheet// Optional: Add some styling (e.g., set the first row as bold)
-
-
-// Step 4: Append the worksheet to the workbook
-XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-
-// Step 5: Write the workbook to a file
-XLSX.writeFile(wb, 'example.xlsx');
-
-console.log('File written successfully!');
-//   const data = productsStore.getAll
-//   console.log('data', data.flat())
-//   const dataFlatten = data.flat()
-//   const itemKeys = Object.keys(dataFlatten[0])
-//   const headers = itemKeys
-
-// // early return if no data
-// // if (!data || !data[0]) {
-// //     return null
-// // }
-
-// const wb = XLSX.utils.book_new();
-// console.log('wb', wb)
-// const worksheet = XLSX.utils.json_to_sheet([])
-// // Add the headers to the worksheet:
-// XLSX.utils.sheet_add_aoa(worksheet, [headers])
-
-// // add data to sheet
-// XLSX.utils.sheet_add_json(worksheet, data, {
-//     skipHeader: true,
-//     origin: -1
-// })
-
-// XLSX.utils.book_append_sheet(wb, worksheet, "readme demo");
-// // return worksheet
-// setTimeout(() => { XLSX.writeFile(wb, "xlsx-js-style-demo.xlsx"); console.log('timeout') }, 10000)
+  console.log('File written successfully!');
 }
 
 onMounted(() => {
