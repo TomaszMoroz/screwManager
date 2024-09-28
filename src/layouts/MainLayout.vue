@@ -12,7 +12,7 @@
         />
 
         <q-toolbar-title>
-          Handle Products
+          Menu
         </q-toolbar-title>
 
         <div> v{{ $q.version }}</div>

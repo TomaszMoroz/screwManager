@@ -1,7 +1,7 @@
 <template>
-  <q-page class="row flex-center">
-    <q-btn @click="load" icon="download" :color="setColor" size="xl" square>Pobierz dane</q-btn>
-    <q-btn @click="createXLSX" icon="upload" size="xl" square>Eksport do xlsx</q-btn>
+  <q-page class="column flex-center">
+    <q-btn @click="load" class="q-mb-md q-px-lg" icon="download" :color="setColor" size="xl" square>Import (API)</q-btn>
+    <q-btn @click="createXLSX" icon="upload" size="xl" square>Pobierz xlsx</q-btn>
       <q-banner v-if="summary" class="bg-grey-9 text-white q-mx-md">
       <template v-slot:avatar>
         <q-icon name="download_done" color="white" />
