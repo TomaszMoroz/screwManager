@@ -230,9 +230,9 @@ async function createXLSX() {
       if (tag.Id >= 1 && tag.Id <= 6) {
         let tagValue = tag.Value || '';
         if (typeof tagValue === 'number') {
-          tagValue = tagValue.toString().replace('.', ',');
+          if (tag.Id !== 3) tagValue = tagValue.toString().replace('.', ',');
         } else if (typeof tagValue === 'string' && !isNaN(tagValue)) {
-          tagValue = tagValue.replace('.', ',');
+          if (tag.Id !== 3) tagValue = tagValue.replace('.', ',');
         }
         tagValues[tag.Id - 1] = tagValue;
       }
