@@ -205,7 +205,7 @@ async function getProducts () {
     }
 }
 
-async function createXLSX() {
+function createXLSX() {
   const wb = XLSX.utils.book_new();
   const flattenData = productsStore.getAll.flat();
   const firstObject = flattenData[0] || {};
