@@ -4,7 +4,9 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('pages/IndexPage.vue') },
-      { path: '/load', component: () => import('pages/LoadData.vue') },
+      // { path: '/load', component: () => import('pages/LoadData.vue') },
+      { path: '/load', component: () => import('pages/LoadAllDataFixed.vue') },
+      // { path: '/loadx', component: () => import('pages/LoadAllData.vue') },
       // { path: '/dictionary', component: () => import('pages/Dictionary.vue') },
       // { path: '/products', component: () => import('pages/Products.vue') }
     ]
