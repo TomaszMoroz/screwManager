@@ -158,8 +158,8 @@ function createXLSX() {
         BaseProductId: originalData.BaseProductId || '',
         Index: originalData.Index || originalData.YourIndex || '',
         ProductFullName: originalData.ProductFullName || product.fullName || '',
-        ProductId_2: originalData.ProductId || '', // powtórzony jak w starej wersji
-        BaseProductId_2: originalData.BaseProductId || '', // powtórzony jak w starej wersji
+        EanBarcode: originalData.EanBarcode || product.ean || '',
+        MultiPackEanBarcode: originalData.MultiPackEanBarcode || '',
         SinglePackQuantityInPieces: originalData.SinglePackQuantityInPieces || product.pieces || '',
         MultiPackQuantityInPieces: originalData.MultiPackQuantityInPieces || '',
         QuantityLimitLevel1: originalData.QuantityLimitLevel1 || '',
@@ -188,7 +188,6 @@ function createXLSX() {
         Tag4: product.tags?.find(t => t.Id === 4)?.Value || '',
         Tag5: product.tags?.find(t => t.Id === 5)?.Value || '',
         Tag6: product.tags?.find(t => t.Id === 6)?.Value || '',
-        // NOWE KOLUMNY NA KOŃCU:
         GroupId: group.id,
         GroupDescription: group.description,
         GroupNorm: group.norm,
@@ -204,18 +203,53 @@ function createXLSX() {
       }
     })
   )
-  // KOLEJNOŚĆ NAGŁÓWKÓW wg klienta, nowe na końcu
   const headers = [
-    'ProductId', 'BaseProductId', 'Index', 'ProductFullName', 'ProductId_2', 'BaseProductId_2',
-    'SinglePackQuantityInPieces', 'MultiPackQuantityInPieces', 'QuantityLimitLevel1', 'QuantityLimitLevel2',
-    'PictureUrl', 'YourMainPrice', 'YourPriceLevel1', 'YourPriceLevel2', 'CurrencyId', 'CurrencyName',
-    'PiecesInStock', 'OtherPossibleQuantity', 'NearestDilivery', 'YourIndex', 'YourProductFullName',
-    'YourEanBarcode', 'IsActive', 'BoxWeight', 'TaxRate', 'CountryOfOrigin', 'CustomTags', 'CategoryMapping',
-    'Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6',
-    // nowe na końcu:
-    'GroupId', 'GroupDescription', 'GroupNorm',
-    'ManufacturerIndex', 'Weight', 'Length', 'Width', 'Height',
-    'PackQuantityInPieces', 'Currency', 'ProductDescription', 'ManufacturerName'
+    'ProductId',
+    'BaseProductId',
+    'Index',
+    'ProductFullName',
+    'EanBarcode',
+    'MultiPackEanBarcode',
+    'SinglePackQuantityInPieces',
+    'MultiPackQuantityInPieces',
+    'QuantityLimitLevel1',
+    'QuantityLimitLevel2',
+    'PictureUrl',
+    'YourMainPrice',
+    'YourPriceLevel1',
+    'YourPriceLevel2',
+    'CurrencyId',
+    'CurrencyName',
+    'PiecesInStock',
+    'OtherPossibleQuantity',
+    'NearestDilivery',
+    'YourIndex',
+    'YourProductFullName',
+    'YourEanBarcode',
+    'IsActive',
+    'BoxWeight',
+    'TaxRate',
+    'CountryOfOrigin',
+    'CustomTags',
+    'CategoryMapping',
+    'Tag1',
+    'Tag2',
+    'Tag3',
+    'Tag4',
+    'Tag5',
+    'Tag6',
+    'GroupId',
+    'GroupDescription',
+    'GroupNorm',
+    'ManufacturerIndex',
+    'Weight',
+    'Length',
+    'Width',
+    'Height',
+    'PackQuantityInPieces',
+    'Currency',
+    'ProductDescription',
+    'ManufacturerName'
   ]
   const excelData = allProducts.map(product =>
     headers.map(header => {
@@ -233,7 +267,7 @@ function createXLSX() {
   ws['!rows'] = [{ hpt: 80 }, ...Array.from({ length: sheetData.length }, () => ({ hpt: 30 }))]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Wszystkie Produkty')
-  const fileName = `argip_wszystkie_produkty_${date.formatDate(Date.now(), 'YYYY-MM-DD_HH-mm-ss')}.xlsx`
+  const fileName = 'argip.xlsx'
   XLSX.writeFile(wb, fileName)
   Notify.create({
     color: 'green-5',
