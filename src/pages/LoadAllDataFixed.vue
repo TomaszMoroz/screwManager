@@ -134,9 +134,12 @@ async function getAllProductsFallback() {
   const specificProducts = []
   const productIdsToFind = [1429, 2384, 32138, 89263]
 
-  // 1. Spróbuj pobrać konkretne produkty bezpośrednio po ID
+  console.log('=== STRATEGIA SKANOWANIA ID ===')
+
+  // 1. Spróbuj pobrać konkretne produkty bezpośrednio po ID (docelowe)
   for (const productId of productIdsToFind) {
     try {
+      console.log(`🔍 Szukanie produktu ID: ${productId}`)
       const response = await axios({
         method: 'get',
         url: `/screw/v1/Products/${productId}`,
@@ -147,9 +150,12 @@ async function getAllProductsFallback() {
       })
 
       if (response.data) {
+        console.log(`✅ Znaleziono produkt ID ${productId}: ${response.data.ProductFullName}`)
         specificProducts.push(response.data)
       }
     } catch (err) {
+      console.log(`❌ Produkt ID ${productId} nie znaleziony bezpośrednio (${err.response?.status})`)
+
       // Próbuj wyszukać po EAN jeśli bezpośrednie ID nie działa
       if (productId === 1429) {
         try {
@@ -162,16 +168,137 @@ async function getAllProductsFallback() {
             }
           })
           if (eanResponse.data) {
+            console.log(`✅ Znaleziono produkt po EAN: ${eanResponse.data.ProductFullName}`)
             specificProducts.push(eanResponse.data)
           }
         } catch (eanErr) {
-          // Ignore EAN search errors
+          console.log(`❌ Wyszukiwanie po EAN też nie powiodło się`)
         }
       }
     }
+    await new Promise(resolve => setTimeout(resolve, 50))
   }
 
-  // 2. Spróbuj pobrać produkty z różnych kategorii (może produkty są pofiltorwane po kategorii)
+  // 2. SYSTEMATYCZNE SKANOWANIE ZAKRESÓW ID
+  console.log('=== ROZPOCZYNANIE SYSTEMATYCZNEGO SKANOWANIA ===')
+
+  const idRanges = [
+    { start: 1, end: 100, name: 'Małe ID (1-100)' },
+    { start: 1000, end: 1100, name: 'Średnie ID low (1000-1100)' },
+    { start: 1400, end: 1500, name: 'Zakres 1429 (1400-1500)' },
+    { start: 2300, end: 2400, name: 'Zakres 2384 (2300-2400)' },
+    { start: 2000, end: 2100, name: 'Średnie ID (2000-2100)' },
+    { start: 5000, end: 5100, name: 'Średnie ID high (5000-5100)' },
+    { start: 10000, end: 10100, name: 'Duże ID low (10000-10100)' },
+    { start: 30000, end: 30100, name: 'Zakres w okolicy 32138' },
+    { start: 32100, end: 32200, name: 'Zakres 32138 (32100-32200)' },
+    { start: 89200, end: 89300, name: 'Zakres 89263 (89200-89300)' },
+    { start: 50000, end: 50100, name: 'Duże ID mid (50000-50100)' },
+    { start: 100000, end: 100100, name: 'Bardzo duże ID (100000-100100)' }
+  ]
+
+  for (const range of idRanges) {
+    console.log(`🔍 Skanowanie zakresu: ${range.name}`)
+    let foundInRange = 0
+
+    for (let id = range.start; id <= range.end; id++) {
+      try {
+        const response = await axios({
+          method: 'get',
+          url: `/screw/v1/Products/${id}`,
+          headers: {
+            "Authorization": `Bearer ${access.value}`,
+            "Content-Type": "application/json"
+          }
+        })
+
+        if (response.data && response.data.ProductId) {
+          foundInRange++
+          console.log(`✅ Znaleziono produkt ID ${id}: ${response.data.ProductFullName}`)
+
+          // Dodaj produkt jeśli nie mamy go już
+          const exists = specificProducts.find(p => p.ProductId === response.data.ProductId)
+          if (!exists) {
+            specificProducts.push(response.data)
+          }
+
+          // Sprawdź czy to jeden z docelowych produktów
+          if (productIdsToFind.includes(id)) {
+            console.log(`🎯 ZNALEZIONO DOCELOWY PRODUKT ID ${id}!`)
+          }
+        }
+      } catch (err) {
+        // Ignoruj błędy dla nieistniejących ID, ale loguj jeśli to nie 404
+        if (err.response?.status !== 404) {
+          console.log(`⚠️ Błąd dla ID ${id}: ${err.response?.status}`)
+        }
+      }
+
+      // Opóźnienie żeby nie przeciążać API
+      await new Promise(resolve => setTimeout(resolve, 20))
+
+      // Przerwij skanowanie zakresu jeśli znajdziemy dużo produktów (oszczędność czasu)
+      if (foundInRange > 20) {
+        console.log(`📊 Znaleziono ${foundInRange} produktów w zakresie ${range.name} - przechodzimy do następnego`)
+        break
+      }
+    }
+
+    console.log(`📊 Zakres ${range.name}: znaleziono ${foundInRange} produktów`)
+
+    // Sprawdź czy już mamy wszystkie docelowe produkty
+    const foundTargetIds = specificProducts.map(p => p.ProductId).filter(id => productIdsToFind.includes(id))
+    if (foundTargetIds.length === productIdsToFind.length) {
+      console.log(`🎯 Znaleziono wszystkie docelowe produkty: ${foundTargetIds.join(', ')} - kończę skanowanie`)
+      break
+    }
+  }
+
+  // 3. Próbuj użyć quickfilter na dedykowanym endpoincie (jak wcześniej)
+  console.log('=== PRÓBOWANIE QUICKFILTER ===')
+  const quickfilterTerms = ['DIN', 'ISO', 'M8', 'M10', 'M12', 'śruby', 'nakrętki']
+
+  for (const term of quickfilterTerms) {
+    try {
+      // Spróbuj różne warianty endpointów z quickfilter
+      const possibleEndpoints = [
+        `/screw/v1/Products/Search?quickfilter=${encodeURIComponent(term)}`,
+        `/screw/v1/Products/Filter?quickfilter=${encodeURIComponent(term)}`,
+        `/screw/v1/Products?quickfilter=${encodeURIComponent(term)}`
+      ]
+
+      for (const endpoint of possibleEndpoints) {
+        try {
+          const filterResponse = await axios({
+            method: 'get',
+            url: endpoint,
+            headers: {
+              "Authorization": `Bearer ${access.value}`,
+              "Content-Type": "application/json"
+            }
+          })
+
+          if (filterResponse.data && Array.isArray(filterResponse.data)) {
+            // Szukaj konkretnych produktów w wynikach filtrowania
+            const foundProducts = filterResponse.data.filter(product =>
+              productIdsToFind.includes(product.ProductId)
+            )
+            specificProducts.push(...foundProducts)
+            console.log(`✅ Quickfilter "${term}" znalazł ${foundProducts.length} docelowych produktów`)
+            break // Jeśli endpoint zadziałał, przejdź do następnego terminu
+          }
+        } catch (endpointErr) {
+          // Spróbuj następny endpoint
+        }
+      }
+    } catch (err) {
+      // Ignore quickfilter errors
+    }
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // 4. Spróbuj pobrać produkty z różnych kategorii (jak wcześniej)
+  console.log('=== PRÓBOWANIE KATEGORII ===')
   try {
     const categoriesResponse = await axios({
       method: 'get',
@@ -184,8 +311,8 @@ async function getAllProductsFallback() {
 
     if (categoriesResponse.data && Array.isArray(categoriesResponse.data)) {
       // Dla każdej kategorii spróbuj pobrać produkty
-      for (const category of categoriesResponse.data.slice(0, 5)) { // Ogranicz do pierwszych 5 kategorii
-        if (category && category.Id) { // Sprawdź czy category i Id istnieją
+      for (const category of categoriesResponse.data.slice(0, 10)) { // Zwiększ do 10 kategorii
+        if (category && category.Id) {
           try {
             const categoryProductsResponse = await axios({
               method: 'get',
@@ -202,6 +329,7 @@ async function getAllProductsFallback() {
                 productIdsToFind.includes(product.ProductId)
               )
               specificProducts.push(...foundProducts)
+              console.log(`✅ Kategoria ${category.Id} zawiera ${foundProducts.length} docelowych produktów`)
             }
           } catch (categoryErr) {
             // Ignore category errors
@@ -211,13 +339,16 @@ async function getAllProductsFallback() {
       }
     }
   } catch (err) {
-    // Ignore categories endpoint errors
+    console.log('❌ Błąd podczas pobierania kategorii')
   }
 
   // Usuń duplikaty
   const uniqueProducts = specificProducts.filter((product, index, self) =>
     index === self.findIndex(p => p.ProductId === product.ProductId)
   )
+
+  console.log(`📊 PODSUMOWANIE FALLBACK: znaleziono ${uniqueProducts.length} unikalnych produktów`)
+  console.log(`🎯 Docelowe produkty znalezione:`, uniqueProducts.filter(p => productIdsToFind.includes(p.ProductId)).map(p => p.ProductId))
 
   return uniqueProducts
 }
