@@ -54,78 +54,162 @@ async function getToken() {
 
 async function getAllProducts() {
   let allProducts = []
-  let page = 1
   const pageSize = 1000
+  const activeOnly = false
+
+  console.log('=== POBIERANIE WSZYSTKICH PRODUKTÓW (STRONY 0-30) ===')
+  console.log(`🔧 Parametry: pageSize=${pageSize}, activeOnly=${activeOnly}`)
+
+  // Statystyki do analizy
+  let emptyPages = 0
+  let fullPages = 0
+  let partialPages = 0
+  let lastNonEmptyPage = -1
+  const pageSizes = []
 
   try {
-    // Najpierw pobierz tylko aktywne produkty
-    while (true) {
+    // Iteruj przez strony od 0 do 30
+    for (let page = 0; page <= 30; page++) {
+      console.log(`📄 Pobieranie strony ${page} (pageSize: ${pageSize}, activeOnly: ${activeOnly})...`)
+
       const response = await axios({
         method: 'get',
-        url: `/screw/v1/Products/${page}/${pageSize}/true`,
+        url: `/screw/v1/Products/${page}/${pageSize}/${activeOnly}`,
         headers: {
           "Authorization": `Bearer ${access.value}`,
           "Content-Type": "application/json"
         }
       })
+
       if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const currentPageSize = response.data.length
+        pageSizes.push(currentPageSize)
+        lastNonEmptyPage = page
+
+        // Kategoryzuj strony
+        if (currentPageSize === pageSize) {
+          fullPages++
+          console.log(`✅ Strona ${page}: PEŁNA - pobrano ${currentPageSize} produktów`)
+        } else {
+          partialPages++
+          console.log(`⚠️ Strona ${page}: CZĘŚCIOWA - pobrano ${currentPageSize} produktów (${currentPageSize}/${pageSize})`)
+        }
+
         allProducts = allProducts.concat(response.data)
-        if (response.data.length < pageSize) break
-        page++
-      } else {
-        break
-      }
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
 
-    // Następnie pobierz wszystkie produkty (aktywne i nieaktywne)
-    page = 1
-    const inactiveProducts = []
-    while (true) {
-      const response = await axios({
-        method: 'get',
-        url: `/screw/v1/Products/${page}/${pageSize}/false`,
-        headers: {
-          "Authorization": `Bearer ${access.value}`,
-          "Content-Type": "application/json"
+        // Dodatkowy debugging dla pierwszych produktów na stronie
+        if (response.data.length > 0) {
+          const firstProduct = response.data[0]
+          const lastProduct = response.data[response.data.length - 1]
+          console.log(`   📋 Pierwszy produkt: ID=${firstProduct.ProductId}, Name="${firstProduct.ProductFullName?.substring(0, 50)}..."`)
+          console.log(`   📋 Ostatni produkt: ID=${lastProduct.ProductId}, Name="${lastProduct.ProductFullName?.substring(0, 50)}..."`)
+
+          // Sprawdź zakres ProductId na tej stronie
+          const productIds = response.data.map(p => p.ProductId).filter(id => id)
+          if (productIds.length > 0) {
+            const minId = Math.min(...productIds)
+            const maxId = Math.max(...productIds)
+            console.log(`   📊 Zakres ProductId na stronie ${page}: ${minId} - ${maxId}`)
+          }
         }
-      })
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        // Dodaj tylko produkty które nie są już w active products
-        const newProducts = response.data.filter(product =>
-          !allProducts.some(existingProduct => existingProduct.ProductId === product.ProductId)
-        )
-        inactiveProducts.push(...newProducts)
-        if (response.data.length < pageSize) break
-        page++
       } else {
+        emptyPages++
+        console.log(`❌ Strona ${page}: PUSTA - brak produktów`)
+      }
+
+      // Analiza po każdej stronie
+      const currentTotal = allProducts.length
+      console.log(`� Aktualnie pobrano: ${currentTotal} produktów (strony 0-${page})`)
+
+      // Opóźnienie między requestami
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Wczesne zakończenie jeśli znajdziemy kilka pustych stron pod rząd
+      if (page > 5 && emptyPages > 3 && page - lastNonEmptyPage > 2) {
+        console.log(`🔄 WCZESNE ZAKOŃCZENIE: Znaleziono ${emptyPages} pustych stron, ostatnia niepusta strona: ${lastNonEmptyPage}`)
         break
       }
-      await new Promise(resolve => setTimeout(resolve, 100))
     }
 
-    // Połącz wszystkie produkty
-    allProducts = allProducts.concat(inactiveProducts)
+    // SZCZEGÓŁOWA ANALIZA POBRANYCH DANYCH
+    console.log('\n=== ANALIZA STRUKTURY BAZY DANYCH ===')
+    console.log(`📊 Łączna liczba produktów: ${allProducts.length}`)
+    console.log(`📄 Strony pełne (${pageSize} produktów): ${fullPages}`)
+    console.log(`📄 Strony częściowe (<${pageSize} produktów): ${partialPages}`)
+    console.log(`📄 Strony puste: ${emptyPages}`)
+    console.log(`📄 Ostatnia niepusta strona: ${lastNonEmptyPage}`)
 
-    // Sprawdź czy wszystkie potrzebne produkty są dostępne
+    if (pageSizes.length > 0) {
+      console.log(`📄 Rozmiary stron: [${pageSizes.join(', ')}]`)
+      const avgPageSize = pageSizes.reduce((a, b) => a + b, 0) / pageSizes.length
+      console.log(`� Średni rozmiar strony: ${avgPageSize.toFixed(1)}`)
+    }
+
+    // Estymacja całkowitego rozmiaru bazy
+    if (fullPages > 0) {
+      const estimatedTotal = fullPages * pageSize + (partialPages > 0 ? pageSizes[pageSizes.length - 1] : 0)
+      console.log(`🎯 Szacunkowy rozmiar całej bazy: ${estimatedTotal} produktów`)
+
+      if (lastNonEmptyPage >= 0) {
+        const suggestedPages = Math.max(30, lastNonEmptyPage + 5)
+        console.log(`💡 REKOMENDACJA: Użyj ${suggestedPages} stron dla pewności (ostatnia niepusta: ${lastNonEmptyPage})`)
+      }
+    }
+
+    // Analiza ProductId
+    if (allProducts.length > 0) {
+      const productIds = allProducts.map(p => p.ProductId).filter(id => id && !isNaN(id))
+      if (productIds.length > 0) {
+        const minId = Math.min(...productIds)
+        const maxId = Math.max(...productIds)
+        console.log(`📊 Zakres ProductId w bazie: ${minId} - ${maxId}`)
+        console.log(`📊 Różnica: ${maxId - minId} (luki: ${maxId - minId + 1 - productIds.length})`)
+
+        // Sprawdź czy są kontrolne produkty
+        const controlIds = [1429, 2384, 32138, 89263]
+        const foundControlIds = controlIds.filter(id => productIds.includes(id))
+        console.log(`🎯 Kontrolne produkty znalezione: [${foundControlIds.join(', ')}]`)
+        const missingControlIds = controlIds.filter(id => !productIds.includes(id))
+        if (missingControlIds.length > 0) {
+          console.log(`❌ BRAKUJĄCE kontrolne produkty: [${missingControlIds.join(', ')}]`)
+        }
+      }
+    }
+
+    console.log(`✅ SUKCES: Pobrano łącznie ${allProducts.length} produktów ze stron 0-${lastNonEmptyPage >= 0 ? lastNonEmptyPage : 30}`)
+
+    // Sprawdź czy wszystkie potrzebne produkty są dostępne - fallback dla dodatkowych produktów
     const missingProducts = await getAllProductsFallback()
     if (missingProducts.length > 0) {
+      console.log(`🔄 Dodawanie ${missingProducts.length} produktów z fallback`)
       // Dodaj tylko produkty które jeszcze nie istnieją
       const newMissingProducts = missingProducts.filter(product =>
         !allProducts.some(existingProduct => existingProduct.ProductId === product.ProductId)
       )
       allProducts = allProducts.concat(newMissingProducts)
+      console.log(`✅ Dodano ${newMissingProducts.length} nowych produktów z fallback`)
     }
 
+    console.log(`📊 FINALNE PODSUMOWANIE: ${allProducts.length} produktów`)
     return allProducts
+
   } catch (err) {
-    console.error('Błąd pobierania produktów:', err)
+    console.error('❌ Błąd pobierania produktów:', err.response?.status, err.response?.statusText)
+    console.error('❌ URL:', err.config?.url)
+
+    // Dodatkowe informacje o błędzie
+    if (err.response?.data) {
+      console.error('❌ Szczegóły błędu:', err.response.data)
+    }
 
     // Jeśli udało się pobrać jakieś dane przed błędem, używamy ich
     if (allProducts.length > 0) {
+      console.log(`⚠️ Zwracam ${allProducts.length} produktów pobranych przed błędem`)
+      console.log(`📊 Strony pobrane przed błędem: pełne=${fullPages}, częściowe=${partialPages}, puste=${emptyPages}`)
       return allProducts
     }
 
+    console.log('🔄 Przechodzę do fallback')
     return await getAllProductsFallback()
   }
 }
