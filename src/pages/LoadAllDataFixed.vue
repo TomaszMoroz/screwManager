@@ -56,13 +56,13 @@ async function getAllProducts() {
   let allProducts = []
   let page = 1
   const pageSize = 1000
-  const activeOnly = false
 
   try {
+    // Najpierw pobierz tylko aktywne produkty
     while (true) {
       const response = await axios({
         method: 'get',
-        url: `/screw/v1/Products/${page}/${pageSize}/${activeOnly}`,
+        url: `/screw/v1/Products/${page}/${pageSize}/true`,
         headers: {
           "Authorization": `Bearer ${access.value}`,
           "Content-Type": "application/json"
@@ -78,10 +78,43 @@ async function getAllProducts() {
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
+    // Następnie pobierz wszystkie produkty (aktywne i nieaktywne)
+    page = 1
+    const inactiveProducts = []
+    while (true) {
+      const response = await axios({
+        method: 'get',
+        url: `/screw/v1/Products/${page}/${pageSize}/false`,
+        headers: {
+          "Authorization": `Bearer ${access.value}`,
+          "Content-Type": "application/json"
+        }
+      })
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        // Dodaj tylko produkty które nie są już w active products
+        const newProducts = response.data.filter(product =>
+          !allProducts.some(existingProduct => existingProduct.ProductId === product.ProductId)
+        )
+        inactiveProducts.push(...newProducts)
+        if (response.data.length < pageSize) break
+        page++
+      } else {
+        break
+      }
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    // Połącz wszystkie produkty
+    allProducts = allProducts.concat(inactiveProducts)
+
     // Sprawdź czy wszystkie potrzebne produkty są dostępne
     const missingProducts = await getAllProductsFallback()
     if (missingProducts.length > 0) {
-      allProducts = allProducts.concat(missingProducts)
+      // Dodaj tylko produkty które jeszcze nie istnieją
+      const newMissingProducts = missingProducts.filter(product =>
+        !allProducts.some(existingProduct => existingProduct.ProductId === product.ProductId)
+      )
+      allProducts = allProducts.concat(newMissingProducts)
     }
 
     return allProducts
@@ -98,10 +131,10 @@ async function getAllProducts() {
 }
 
 async function getAllProductsFallback() {
-  // Spróbuj pobrać konkretne produkty bezpośrednio po ID
   const specificProducts = []
-  const productIdsToFind = [1429, 32138, 89263]
+  const productIdsToFind = [1429, 2384, 32138, 89263]
 
+  // 1. Spróbuj pobrać konkretne produkty bezpośrednio po ID
   for (const productId of productIdsToFind) {
     try {
       const response = await axios({
@@ -138,7 +171,55 @@ async function getAllProductsFallback() {
     }
   }
 
-  return specificProducts
+  // 2. Spróbuj pobrać produkty z różnych kategorii (może produkty są pofiltorwane po kategorii)
+  try {
+    const categoriesResponse = await axios({
+      method: 'get',
+      url: `/screw/v1/Categories`,
+      headers: {
+        "Authorization": `Bearer ${access.value}`,
+        "Content-Type": "application/json"
+      }
+    })
+
+    if (categoriesResponse.data && Array.isArray(categoriesResponse.data)) {
+      // Dla każdej kategorii spróbuj pobrać produkty
+      for (const category of categoriesResponse.data.slice(0, 5)) { // Ogranicz do pierwszych 5 kategorii
+        if (category && category.Id) { // Sprawdź czy category i Id istnieją
+          try {
+            const categoryProductsResponse = await axios({
+              method: 'get',
+              url: `/screw/v1/Products/Category/${category.Id}`,
+              headers: {
+                "Authorization": `Bearer ${access.value}`,
+                "Content-Type": "application/json"
+              }
+            })
+
+            if (categoryProductsResponse.data && Array.isArray(categoryProductsResponse.data)) {
+              // Szukaj konkretnych produktów w tej kategorii
+              const foundProducts = categoryProductsResponse.data.filter(product =>
+                productIdsToFind.includes(product.ProductId)
+              )
+              specificProducts.push(...foundProducts)
+            }
+          } catch (categoryErr) {
+            // Ignore category errors
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    }
+  } catch (err) {
+    // Ignore categories endpoint errors
+  }
+
+  // Usuń duplikaty
+  const uniqueProducts = specificProducts.filter((product, index, self) =>
+    index === self.findIndex(p => p.ProductId === product.ProductId)
+  )
+
+  return uniqueProducts
 }
 
 async function load() {
