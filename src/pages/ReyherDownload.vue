@@ -154,7 +154,7 @@ async function callOrdersimulate(batch, posOffset = 0) {
   const token = await getReyherToken()
   const items = batch.map((sku, idx) => ({
     position: idx + posOffset,
-    sku,
+    sku: sku.toString().padStart(15, '0'),
     quantity: 900000 // zapytanie o 900000 sztuk
   }))
   // LOGUJEMY batch wysyłanych SKU
