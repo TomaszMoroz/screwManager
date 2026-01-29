@@ -155,7 +155,7 @@ async function callOrdersimulate(batch, posOffset = 0) {
   const items = batch.map((sku, idx) => ({
     position: idx + posOffset,
     sku,
-    quantity: 1000 // lub inna domyślna ilość
+    quantity: 900000 // zapytanie o 900000 sztuk
   }))
   // LOGUJEMY batch wysyłanych SKU
   console.log('callOrdersimulate batch', items)
