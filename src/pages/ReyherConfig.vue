@@ -17,6 +17,7 @@
             Plik <b>{{ csvFileName }}</b> został załadowany.
           </q-banner>
         </div>
+
       </q-card-section>
     </q-card>
     <q-card class="q-mb-md">
@@ -79,18 +80,18 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useQuasar } from 'quasar'
 import { useReyherConfigStore } from 'src/stores/reyherConfigStore'
 
+const $q = useQuasar()
 const store = useReyherConfigStore()
 const csvData = ref(store.csvData)
 const csvFileName = ref('')
-const groupList = ref([])
+const groupList = ref(store.groupsList || [])
 const selectedRows = ref([])
 const tableFilter = ref('')
 
-
 const newGroup = ref({ norma: '', material: '', pokrycie: '' })
-
 
 const normaOptions = computed(() => {
   // Unikalne pierwsze 6 znaków z każdego SKU
@@ -164,19 +165,19 @@ function addGroup() {
     pokrycie: newGroup.value.pokrycie
   })
   newGroup.value = { norma: '', material: '', pokrycie: '' }
-  saveGroups()
+  store.setGroupsList(groupList.value)
 }
 
 function removeGroup(row) {
   groupList.value = groupList.value.filter(g => g.id !== row.id)
-  saveGroups()
+  store.setGroupsList(groupList.value)
 }
 
 function removeSelected() {
   const ids = selectedRows.value.map(r => r.id)
   groupList.value = groupList.value.filter(g => !ids.includes(g.id))
   selectedRows.value = []
-  saveGroups()
+  store.setGroupsList(groupList.value)
 }
 
 function editGroup(row) {
@@ -186,18 +187,28 @@ function editGroup(row) {
 }
 
 function addToDownloadList() {
+  // Dodaj do listy pobrań tylko unikalne klucze (norma+material+pokrycie)
+  const currentKeys = new Set((store.downloadList || []).map(item => item.key))
+  let added = 0
   selectedRows.value.forEach(row => {
-    store.addToDownloadList(row)
+    const key = `${row.norma}${row.material}${row.pokrycie}`
+    if (!currentKeys.has(key)) {
+      store.addToDownloadList({ key })
+      currentKeys.add(key)
+      added++
+    }
   })
   selectedRows.value = []
+  if (added > 0) {
+    $q.notify({ type: 'positive', message: `Dodano ${added} wpis(ów) do listy pobrania.` })
+  } else {
+    $q.notify({ type: 'info', message: 'Wybrane wpisy już znajdują się na liście pobrania.' })
+  }
 }
 
-function saveGroups() {
-  store.setDownloadList(groupList.value)
-}
 
 // Inicjalizacja z localStorage jeśli istnieje
-if (store.downloadList && Array.isArray(store.downloadList)) {
-  groupList.value = [...store.downloadList]
+if (store.groupsList && Array.isArray(store.groupsList)) {
+  groupList.value = [...store.groupsList]
 }
 </script>
