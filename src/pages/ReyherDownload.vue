@@ -15,7 +15,7 @@
         </ul>
       </q-banner>
       <q-banner v-if="success" class="bg-green-2 text-green-8 q-mt-md">Pobieranie zakończone sukcesem!</q-banner>
-      <q-btn v-if="success && results.length" color="secondary" icon="upload" class="q-mb-md" label="Pobierz xlsx" @click="exportXLSX" />
+      <q-btn v-if="success && results.length" color="secondary" icon="upload" class="q-my-md" label="Pobierz xlsx" @click="exportXLSX" />
       <q-table
         v-if="results.length"
         :rows="results"
@@ -56,6 +56,7 @@
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useReyherConfigStore } from 'src/stores/reyherConfigStore'
+import axios from 'axios'
 
 const $q = useQuasar()
 const store = useReyherConfigStore()
@@ -76,37 +77,120 @@ const columns = [
 ]
 
 const detailColumns = [
-  { name: 'sku', label: 'SKU', field: 'sku', align: 'left' },
-  { name: 'qty', label: 'Ilość', field: 'qty', align: 'right' },
-  { name: 'price', label: 'Cena', field: 'price', align: 'right' }
+  { name: 'SKU', label: 'SKU', field: 'sku', align: 'left' },
+  { name: 'QuantityAvailable', label: 'QuantityAvailable', field: 'qty', align: 'right' },
+  { name: 'Price', label: 'Price', field: 'price', align: 'right' },
+  { name: 'PriceQuantity', label: 'PriceQuantity', field: 'priceQuantity', align: 'right' },
+  { name: 'Position', label: 'Position', field: 'position', align: 'right' },
+  { name: 'PositionPrice', label: 'PositionPrice', field: 'positionPrice', align: 'right' },
+  { name: 'PositionPriceQuantity', label: 'PositionPriceQuantity', field: 'positionPriceQuantity', align: 'right' },
+  { name: 'QuantityUnit', label: 'QuantityUnit', field: 'quantityUnit', align: 'left' },
+  { name: 'Currency', label: 'Currency', field: 'currency', align: 'left' },
+  { name: 'Remark', label: 'Remark', field: 'remark', align: 'left' }
 ]
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-        import XLSX from 'xlsx-js-style'
-        function exportXLSX() {
-          // Przygotuj nagłówki
-          const headers = ['Grupa', 'Nazwa', 'SKU', 'Ilość', 'Cena']
-          // Spłaszcz dane do wierszy
-          const rows = results.value.flatMap(group =>
-            group.details.map(item => [
-              group.groupKey,
-              group.nazwa,
-              item.sku,
-              item.qty,
-              item.price
-            ])
-          )
-          const sheetData = [headers, ...rows]
-          const ws = XLSX.utils.aoa_to_sheet(sheetData)
-          ws['!rows'] = [{ hpt: 80 }, ...Array.from({ length: sheetData.length }, () => ({ hpt: 30 }))]
-          const wb = XLSX.utils.book_new()
-          XLSX.utils.book_append_sheet(wb, ws, 'Reyher')
-          const fileName = `reyher_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.xlsx`
-          XLSX.writeFile(wb, fileName)
-        }
+import XLSX from 'xlsx-js-style'
+function exportXLSX() {
+  // Przygotuj nagłówki
+  const headers = [
+    'Grupa', 'Nazwa', 'SKU', 'Ilość', 'Cena', 'Ilość ceny', 'Pozycja', 'Cena pozycji', 'Ilość pozycji', 'Dostępność', 'Jednostka', 'Waluta', 'Uwagi'
+  ]
+  // Spłaszcz dane do wierszy
+  const rows = results.value.flatMap(group =>
+    group.details.map(item => [
+      group.groupKey,
+      group.nazwa,
+      item.sku,
+      item.qty,
+      item.price,
+      item.priceQuantity,
+      item.position,
+      item.positionPrice,
+      item.positionPriceQuantity,
+      item.quantityAvailable,
+      item.quantityUnit,
+      item.currency,
+      item.remark
+    ])
+  )
+  const sheetData = [headers, ...rows]
+  const ws = XLSX.utils.aoa_to_sheet(sheetData)
+  ws['!rows'] = [{ hpt: 80 }, ...Array.from({ length: sheetData.length }, () => ({ hpt: 30 }))]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Reyher')
+  const fileName = `reyher_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.xlsx`
+  XLSX.writeFile(wb, fileName)
+}
+
+
+// --- TOKEN & API CONFIG ---
+const REYHER_TOKEN_URL = '/reyher-token'
+const REYHER_API_URL = '/reyher-ordersimulate'
+const REYHER_USER = 'a.podjaski@olmet.gda.pl'
+const REYHER_PASS = '2>NkgA-B9^'
+let reyherToken = ''
+
+async function getReyherToken() {
+  if (reyherToken) return reyherToken
+  try {
+    const res = await axios.post(REYHER_TOKEN_URL, {
+      username: REYHER_USER,
+      password: REYHER_PASS
+    })
+    reyherToken = res.data
+    return reyherToken
+  } catch (e) {
+    const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message
+    $q.notify({ type: 'negative', message: 'Błąd pobierania tokena Reyher: ' + msg })
+    throw new Error('Błąd pobierania tokena Reyher: ' + msg)
+  }
+}
+
+async function callOrdersimulate(batch, posOffset = 0) {
+  const token = await getReyherToken()
+  const items = batch.map((sku, idx) => ({
+    position: idx + posOffset,
+    sku,
+    quantity: 1000 // lub inna domyślna ilość
+  }))
+  // LOGUJEMY batch wysyłanych SKU
+  console.log('callOrdersimulate batch', items)
+  try {
+    const res = await axios.post(REYHER_API_URL, { items }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    // LOGUJEMY pełną odpowiedź z API
+    console.log('callOrdersimulate response', res.data)
+    // Obsługa odpowiedzi jako tablica (nowa struktura)
+    let itemsResp = []
+    if (Array.isArray(res.data)) {
+      itemsResp = res.data[0]?.Payload?.Items || []
+    } else {
+      itemsResp = res.data?.OrderSimulateResponse?.Payload?.Items || []
+    }
+    return itemsResp.map(item => ({
+      sku: item.SKU,
+      qty: item.QuantityAvailable,
+      price: item.Price,
+      priceQuantity: item.PriceQuantity,
+      position: item.Position,
+      positionPrice: item.PositionPrice,
+      positionPriceQuantity: item.PositionPriceQuantity,
+      quantityAvailable: item.QuantityAvailable,
+      quantityUnit: item.QuantityUnit,
+      currency: item.Currency,
+      remark: item.Remark
+    }))
+  } catch (e) {
+    const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message
+    $q.notify({ type: 'negative', message: 'Błąd w callOrdersimulate: ' + msg })
+    throw new Error('Błąd w callOrdersimulate: ' + msg)
+  }
+}
 
 async function startDownload() {
   downloading.value = true
@@ -115,10 +199,12 @@ async function startDownload() {
   results.value = []
   let totalBatches = 0
   let completedBatches = 0
+  // Upewnij się, że bierzemy tylko SKU z CSV zaczynające się od klucza grupy
   const allGroups = store.downloadList.map(dl => {
     const groupKey = dl.key
     const nazwa = dl.nazwa || ''
-    const skus = store.csvData.filter(sku => sku.startsWith(groupKey))
+    // Filtruj tylko SKU z CSV zaczynające się od klucza grupy
+    const skus = (store.csvData || []).filter(sku => sku.startsWith(groupKey))
     // podziel na paczki po 100
     const batches = []
     for (let i = 0; i < skus.length; i += 100) {
@@ -133,43 +219,45 @@ async function startDownload() {
     let groupItems = []
     let details = []
     let groupError = false
+    let posOffset = 0
     for (const batch of group.batches) {
       try {
-        // await API call here, replace with real API
-        const response = await fakeApiCall(batch)
+        const response = await callOrdersimulate(batch, posOffset)
         groupItems = groupItems.concat(response.map(r => r.sku))
         details = details.concat(response)
         completedBatches++
         progress.value = completedBatches / totalBatches
+        posOffset += batch.length
         await sleep(5200)
       } catch (e) {
         groupError = true
-        $q.notify({ type: 'negative', message: `Błąd pobierania dla grupy ${group.groupKey}` })
+        $q.notify({ type: 'negative', message: `Błąd pobierania dla grupy ${group.groupKey}: ${e.message}` })
         break
       }
     }
+    // LOGUJEMY szczegóły detali dla każdej grupy
+    console.log('details for group', group.groupKey, details)
     if (groupError) {
       errorGroups.value.push({ groupKey: group.groupKey, nazwa: group.nazwa })
     } else {
       apiResults.push({ groupKey: group.groupKey, nazwa: group.nazwa, skuCount: group.skus.length, items: groupItems.length, details })
     }
   }
+  // LOGUJEMY całość wyników
+  console.log('results', apiResults)
   results.value = apiResults
   downloading.value = false
-  success.value = true
-  $q.notify({ type: 'positive', message: 'Pobieranie zakończone!' })
+  if (errorGroups.value.length && apiResults.length) {
+    success.value = false
+    $q.notify({ type: 'warning', message: 'Pobieranie zakończone częściowo: niektóre grupy zakończone błędem.' })
+  } else if (errorGroups.value.length && !apiResults.length) {
+    success.value = false
+    $q.notify({ type: 'negative', message: 'Pobieranie nie powiodło się dla wszystkich grup.' })
+  } else {
+    success.value = true
+    $q.notify({ type: 'positive', message: 'Pobieranie zakończone sukcesem!' })
+  }
 }
 
-// Fake API call for demo
-async function fakeApiCall(batch) {
-  // Simulate network delay and random error
-  await sleep(500)
-  if (Math.random() < 0.05) throw new Error('Random API error')
-  // Return array of objects with details
-  return batch.map(sku => ({
-    sku,
-    qty: Math.floor(Math.random() * 100),
-    price: (Math.random() * 100).toFixed(2)
-  }))
-}
+
 </script>
