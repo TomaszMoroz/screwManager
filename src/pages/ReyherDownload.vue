@@ -16,6 +16,11 @@
       </q-banner>
       <q-banner v-if="success" class="bg-green-2 text-green-8 q-mt-md">Pobieranie zakończone sukcesem!</q-banner>
       <q-btn v-if="success && results.length" color="secondary" icon="upload" class="q-my-md" label="Pobierz xlsx" @click="exportXLSX" />
+      <div v-if="results.length" class="q-mb-md">
+        <q-banner class="bg-blue-1 text-blue-10">
+          Wysłano {{ totalSkuSent }} SKU, pobrano {{ totalSkuFetched }} SKU z bazy.
+        </q-banner>
+      </div>
       <q-table
         v-if="results.length"
         :rows="results"
@@ -58,6 +63,7 @@ import { useQuasar } from 'quasar'
 import { useReyherConfigStore } from 'src/stores/reyherConfigStore'
 import axios from 'axios'
 
+
 const $q = useQuasar()
 const store = useReyherConfigStore()
 
@@ -68,6 +74,17 @@ const error = ref('')
 const success = ref(false)
 const results = ref([])
 const errorGroups = ref([])
+
+// Liczba wysłanych SKU (sumarycznie)
+const totalSkuSent = computed(() => {
+  // Suma wszystkich skuCount z results lub 0
+  return results.value.reduce((sum, group) => sum + (group.skuCount || 0), 0)
+})
+// Liczba pobranych SKU (sumarycznie)
+const totalSkuFetched = computed(() => {
+  // Suma wszystkich items z results lub 0
+  return results.value.reduce((sum, group) => sum + (group.items || 0), 0)
+})
 
 const columns = [
   { name: 'groupKey', label: 'Grupa', field: 'groupKey', align: 'left' },
