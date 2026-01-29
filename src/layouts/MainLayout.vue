@@ -58,7 +58,7 @@ const linksList = [
     title: 'Pobierz Reyher',
     caption: 'API Reyher',
     icon: 'cloud_download',
-    path: 'load-reyher'
+    path: 'reyher-download'
   },
   {
     title: 'Reyher config',

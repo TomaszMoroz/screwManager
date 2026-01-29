@@ -29,6 +29,7 @@ export default [
       { path: 'load', component: () => import('pages/LoadAllData.vue') },
       { path: 'loadalldatafixed', component: () => import('pages/LoadAllDataFixed.vue') },
       { path: 'load-reyher', component: () => import('pages/LoadReyher.vue') },
+      { path: 'reyher-download', component: () => import('pages/ReyherDownload.vue') },
       { path: 'reyher-config', component: () => import('pages/ReyherConfig.vue') },
       { path: 'products', component: () => import('pages/Products.vue') },
       { path: 'dictionary', component: () => import('pages/Dictionary.vue') }

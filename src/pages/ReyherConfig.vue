@@ -70,6 +70,7 @@
           :rows="groupList"
           :columns="columns"
           row-key="id"
+          selection="multiple"
           v-model:selected="selectedRows"
           :filter="tableFilter"
         >
@@ -101,19 +102,21 @@
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
         <q-card-section>
-          <div v-if="!store.downloadList.length" class="text-grey">Brak wpisów</div>
+          <q-input v-model="downloadListFilter" label="Filtruj listę do pobrania..." dense clearable class="q-mb-sm" />
+          <div v-if="!filteredDownloadList.length" class="text-grey">Brak wpisów</div>
           <q-list v-else bordered dense>
-            <q-item v-for="(item, idx) in store.downloadList" :key="item.key">
+            <q-item v-for="(item, idx) in filteredDownloadList" :key="item.key">
               <q-item-section>
-  <div><strong>{{ item.key }}</strong></div>
-  <div v-if="item.nazwa" class="text-caption text-grey">{{ item.nazwa }}</div>
-</q-item-section>
+                <div><strong>{{ item.key }}</strong></div>
+                <div v-if="item.nazwa" class="text-caption text-grey">{{ item.nazwa }}</div>
+              </q-item-section>
               <q-item-section side>
-                <q-btn icon="delete" color="negative" flat round dense @click="removeFromDownloadList(idx)" />
+                <q-btn icon="delete" color="negative" flat round dense @click="removeFromDownloadList(getDownloadListIndex(item))" />
               </q-item-section>
             </q-item>
           </q-list>
         </q-card-section>
+
         <q-card-actions align="right" v-if="store.downloadList.length">
           <q-btn flat color="negative" label="Usuń wszystko" @click="clearDownloadList" />
         </q-card-actions>
@@ -176,6 +179,19 @@ const columns = [
   { name: 'doPobrania', label: 'Do pobrania', field: 'doPobrania', align: 'center' },
   { name: 'actions', label: 'Akcje', field: 'actions', align: 'center' }
 ]
+
+        const downloadListFilter = ref("")
+        const filteredDownloadList = computed(() => {
+          if (!downloadListFilter.value) return store.downloadList || []
+          const filter = downloadListFilter.value.toLowerCase()
+          return (store.downloadList || []).filter(item =>
+            (item.key && item.key.toLowerCase().includes(filter)) ||
+            (item.nazwa && item.nazwa.toLowerCase().includes(filter))
+          )
+        })
+        function getDownloadListIndex(item) {
+          return (store.downloadList || []).findIndex(i => i.key === item.key)
+        }
 
 function onFileAdded(files) {
   if (!files.length) return
