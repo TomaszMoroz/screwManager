@@ -97,6 +97,21 @@ devServer: {
       pathRewrite: {
         '^/screw': ''
       }
+    },
+    // Proxy for Reyher API
+    '/reyher-token': {
+      target: 'https://rio.reyher.de/rest/reyher_int_de/V1/integration/customer/token',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/reyher-token': ''
+      }
+    },
+    '/reyher-ordersimulate': {
+      target: 'https://rio.reyher.de/rest/reyher_int_de/V1/sapordersimulate/mine/getOrdersimulate',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/reyher-ordersimulate': ''
+      }
     }
     // '/screw': {
     //   target: 'https://argipapi.argip.com.pl',

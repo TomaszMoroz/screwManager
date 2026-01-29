@@ -55,7 +55,19 @@ const $router = useRouter()
 
 const linksList = [
   {
-    title: 'Pobierz',
+    title: 'Pobierz Reyher',
+    caption: 'API Reyher',
+    icon: 'cloud_download',
+    path: 'load-reyher'
+  },
+  {
+    title: 'Reyher config',
+    caption: 'Konfiguracja Reyher',
+    icon: 'settings',
+    path: 'reyher-config'
+  },
+  {
+    title: 'Pobierz Agrip',
     caption: 'token/ dane',
     icon: 'download',
     path: 'load'
