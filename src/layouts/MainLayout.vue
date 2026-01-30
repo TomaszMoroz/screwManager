@@ -70,7 +70,7 @@ const linksList = [
     title: 'Pobierz Agrip',
     caption: 'token/ dane',
     icon: 'download',
-    path: 'load'
+    path: 'loadalldatafixed'
   },
   {
     title: 'Pordukty',

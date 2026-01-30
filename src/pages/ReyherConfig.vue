@@ -16,6 +16,9 @@
           <q-banner dense class="bg-green-1 text-green-10">
             Plik <b>{{ csvFileName }}</b> został załadowany.
           </q-banner>
+          <div class="q-mt-xs text-caption text-grey-8">
+            Liczba wpisów do pobrania: <b>{{ csvData.length }}</b>
+          </div>
         </div>
 
       </q-card-section>

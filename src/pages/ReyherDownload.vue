@@ -95,6 +95,7 @@ const columns = [
 
 const detailColumns = [
   { name: 'SKU', label: 'SKU', field: 'sku', align: 'left' },
+  { name: 'Status', label: 'Status', field: 'status', align: 'left' },
   { name: 'QuantityAvailable', label: 'QuantityAvailable', field: 'qty', align: 'right' },
   { name: 'Price', label: 'Price', field: 'price', align: 'right' },
   { name: 'PriceQuantity', label: 'PriceQuantity', field: 'priceQuantity', align: 'right' },
@@ -252,12 +253,24 @@ async function startDownload() {
         break
       }
     }
+    // Oznacz brakujące SKU jako "brak w bazie"
+    const foundSkus = new Set(details.map(d => d.sku))
+    const allBatchSkus = group.batches.flat()
+    const notFoundSkus = allBatchSkus.filter(sku => !foundSkus.has(sku))
+    const notFoundDetails = notFoundSkus.map(sku => ({
+      sku,
+      status: 'brak w bazie',
+      qty: '', price: '', priceQuantity: '', position: '', positionPrice: '', positionPriceQuantity: '', quantityUnit: '', currency: '', remark: ''
+    }))
+    // Dodaj status do znalezionych
+    const detailsWithStatus = details.map(d => ({ ...d, status: 'OK' }))
+    const allDetails = [...detailsWithStatus, ...notFoundDetails]
     // LOGUJEMY szczegóły detali dla każdej grupy
-    console.log('details for group', group.groupKey, details)
+    console.log('details for group', group.groupKey, allDetails)
     if (groupError) {
       errorGroups.value.push({ groupKey: group.groupKey, nazwa: group.nazwa })
     } else {
-      apiResults.push({ groupKey: group.groupKey, nazwa: group.nazwa, skuCount: group.skus.length, items: groupItems.length, details })
+      apiResults.push({ groupKey: group.groupKey, nazwa: group.nazwa, skuCount: group.skus.length, items: groupItems.length, details: allDetails })
     }
   }
   // LOGUJEMY całość wyników
