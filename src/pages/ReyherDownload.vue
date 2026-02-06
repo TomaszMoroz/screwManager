@@ -135,6 +135,21 @@ function exportXLSX() {
       item.remark
     ])
   )
+  // Znajdź SKU z pustymi danymi (qty, price, quantityAvailable itp.)
+  const emptyRows = results.value.flatMap(group =>
+    group.details.filter(item =>
+      (!item.qty && !item.quantityAvailable) || item.qty === '' || item.quantityAvailable === ''
+    ).map(item => ({
+      group: group.groupKey,
+      sku: item.sku,
+      qty: item.qty,
+      price: item.price,
+      quantityAvailable: item.quantityAvailable
+    }))
+  )
+  if (emptyRows.length > 0) {
+    console.warn('SKU z pustymi danymi przed eksportem do Excela:', emptyRows)
+  }
   const sheetData = [headers, ...rows]
   const ws = XLSX.utils.aoa_to_sheet(sheetData)
   ws['!rows'] = [{ hpt: 80 }, ...Array.from({ length: sheetData.length }, () => ({ hpt: 30 }))]
@@ -263,10 +278,37 @@ async function startDownload() {
       qty: '', price: '', priceQuantity: '', position: '', positionPrice: '', positionPriceQuantity: '', quantityUnit: '', currency: '', remark: ''
     }))
     // Dodaj status do znalezionych
-    const detailsWithStatus = details.map(d => ({ ...d, status: 'OK' }))
+    const detailsWithStatus = details.map(d => {
+      // Jeśli pole qty, price, quantityAvailable itp. są puste/null/undefined, wpisz tekst
+      const emptyText = 'zwrocono puste pole z Reyher'
+      return {
+        ...d,
+        qty: (d.qty === '' || d.qty === null || d.qty === undefined) ? emptyText : d.qty,
+        price: (d.price === '' || d.price === null || d.price === undefined) ? emptyText : d.price,
+        priceQuantity: (d.priceQuantity === '' || d.priceQuantity === null || d.priceQuantity === undefined) ? emptyText : d.priceQuantity,
+        position: (d.position === '' || d.position === null || d.position === undefined) ? emptyText : d.position,
+        positionPrice: (d.positionPrice === '' || d.positionPrice === null || d.positionPrice === undefined) ? emptyText : d.positionPrice,
+        positionPriceQuantity: (d.positionPriceQuantity === '' || d.positionPriceQuantity === null || d.positionPriceQuantity === undefined) ? emptyText : d.positionPriceQuantity,
+        quantityAvailable: (d.quantityAvailable === '' || d.quantityAvailable === null || d.quantityAvailable === undefined) ? emptyText : d.quantityAvailable,
+        quantityUnit: (d.quantityUnit === '' || d.quantityUnit === null || d.quantityUnit === undefined) ? emptyText : d.quantityUnit,
+        currency: (d.currency === '' || d.currency === null || d.currency === undefined) ? emptyText : d.currency,
+        remark: (d.remark === '' || d.remark === null || d.remark === undefined) ? emptyText : d.remark,
+        status: 'OK'
+      }
+    })
     const allDetails = [...detailsWithStatus, ...notFoundDetails]
     // LOGUJEMY szczegóły detali dla każdej grupy
     console.log('details for group', group.groupKey, allDetails)
+    // Logujemy różnicę: SKU bez odpowiedzi lub z pustą odpowiedzią
+    if (notFoundSkus.length > 0) {
+      const emptyResponseSkus = details
+        .filter(d => !d.qty && d.status === 'OK')
+        .map(d => d.sku)
+      const allProblematic = Array.from(new Set([...notFoundSkus, ...emptyResponseSkus]))
+      if (allProblematic.length > 0) {
+        console.warn(`SKU bez odpowiedzi lub z pustą odpowiedzią dla grupy ${group.groupKey}:`, allProblematic)
+      }
+    }
     if (groupError) {
       errorGroups.value.push({ groupKey: group.groupKey, nazwa: group.nazwa })
     } else {
